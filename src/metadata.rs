@@ -902,6 +902,10 @@ mod tests {
         assert_eq!(t("25 secs"), Some(0)); // round down
         assert_eq!(t("1 min 25 secs"), Some(1)); // round down
         assert_eq!(t("   0  hours 90min 59 sec "), Some(91));
+        assert_eq!(t("30 秒"), Some(1));
+        assert_eq!(t("3 分"), Some(3));
+        assert_eq!(t("1 時間"), Some(60));
+        assert_eq!(t("1 時間 30 分"), Some(90));
     }
 
     #[test]
