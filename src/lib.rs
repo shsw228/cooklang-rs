@@ -272,3 +272,31 @@ impl CooklangParser {
 pub fn parse(input: &str) -> RecipeResult {
     CooklangParser::default().parse(input)
 }
+
+#[cfg(feature = "bundled_units")]
+fn locale_from_frontmatter(input: &str) -> Option<String> {
+    let split = parser::frontmatter::parse_frontmatter(input)?;
+    let yaml: serde_yaml::Value = serde_yaml::from_str(split.yaml_text).ok()?;
+    let map = yaml.as_mapping()?;
+    let value = map.get("locale")?;
+    let locale = value.as_str()?;
+    if locale.is_empty() {
+        None
+    } else {
+        Some(locale.to_string())
+    }
+}
+
+/// Parse a recipe with a default parser, automatically applying locale-scoped
+/// bundled unit aliases from frontmatter when available.
+///
+/// This affects parser acceptance of localized unit spellings, not rendering.
+#[cfg(feature = "bundled_units")]
+pub fn parse_with_recipe_locale(input: &str) -> RecipeResult {
+    let parser = if let Some(locale) = locale_from_frontmatter(input) {
+        CooklangParser::new(Extensions::all(), Converter::bundled_with_locale(&locale))
+    } else {
+        CooklangParser::default()
+    };
+    parser.parse(input)
+}

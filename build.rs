@@ -201,6 +201,58 @@ fn generate_bundled() {
         quote! { None }
     };
 
+    let locale_aliases = uf
+        .get("locale_aliases")
+        .map(|v| {
+            let locales = v.as_table().unwrap();
+            let n = locales.len();
+            let entries = locales.iter().map(|(locale, entry)| {
+                let entry = entry.as_table().unwrap();
+                let quote_group = |group_name: &str| {
+                    if let Some(group) = entry.get(group_name) {
+                        let group = group.as_table().unwrap();
+                        let n = group.len();
+                        let inserts = group.iter().map(|(unit, aliases)| {
+                            let vals = aliases.as_array().unwrap().iter().map(|s| {
+                                let s = s.as_str().unwrap();
+                                quote! { Arc::from(#s) }
+                            });
+                            quote! { m.insert(#unit.to_string(), vec![#(#vals),*]); }
+                        });
+                        quote! {{
+                            let mut m = HashMap::with_capacity(#n);
+                            #(#inserts)*
+                            m
+                        }}
+                    } else {
+                        quote! { HashMap::new() }
+                    }
+                };
+
+                let time = quote_group("time");
+                let volume = quote_group("volume");
+                let mass = quote_group("mass");
+                let length = quote_group("length");
+                let temperature = quote_group("temperature");
+
+                quote! {
+                    map.insert(#locale.to_string(), LocaleAliases {
+                        time: #time,
+                        volume: #volume,
+                        mass: #mass,
+                        length: #length,
+                        temperature: #temperature,
+                    });
+                }
+            });
+            quote! {{
+                let mut map = HashMap::with_capacity(#n);
+                #(#entries)*
+                map
+            }}
+        })
+        .unwrap_or_else(|| quote! { HashMap::new() });
+
     let quantity = uf
         .get("quantity")
         .map(|v| {
@@ -356,6 +408,7 @@ fn generate_bundled() {
                     si: #si,
                     fractions: #fractions,
                     extend: #extend,
+                    locale_aliases: #locale_aliases,
                     quantity: #quantity,
                 }
             }

@@ -84,6 +84,16 @@ impl Converter {
             .unwrap()
     }
 
+    /// Converter with the bundled units plus locale-specific alias overlays.
+    #[cfg(feature = "bundled_units")]
+    pub fn bundled_with_locale(locale: &str) -> Self {
+        ConverterBuilder::new()
+            .with_units_file_locale(UnitsFile::bundled(), locale)
+            .unwrap()
+            .finish()
+            .unwrap()
+    }
+
     /// Get the default unit [System]
     pub fn default_system(&self) -> System {
         self.default_system

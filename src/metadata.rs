@@ -885,7 +885,7 @@ mod tests {
     #[cfg(feature = "bundled_units")]
     #[test]
     fn test_parse_time_with_units() {
-        let converter = Converter::bundled();
+        let converter = Converter::bundled_with_locale("ja_JP");
         let t = |s: &str| parse_time_with_units(s, &converter).ok();
         assert_eq!(t(""), Some(0));
         assert_eq!(t("1"), None);

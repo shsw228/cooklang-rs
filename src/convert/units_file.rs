@@ -31,9 +31,25 @@ pub struct UnitsFile {
     pub fractions: Option<Fractions>,
     /// Extend and/or edit units from other layers before
     pub extend: Option<Extend>,
+    /// Locale-specific accepted aliases grouped by physical quantity.
+    ///
+    /// These overlays are optional and sparse. Only the units explicitly
+    /// present for a locale are extended.
+    #[serde(default)]
+    pub locale_aliases: HashMap<String, LocaleAliases>,
     /// Declare new units
     #[serde(default)]
     pub quantity: Vec<QuantityGroup>,
+}
+
+#[derive(Debug, Default, Deserialize, Clone, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+pub struct LocaleAliases {
+    pub time: HashMap<String, Vec<Arc<str>>>,
+    pub volume: HashMap<String, Vec<Arc<str>>>,
+    pub mass: HashMap<String, Vec<Arc<str>>>,
+    pub length: HashMap<String, Vec<Arc<str>>>,
+    pub temperature: HashMap<String, Vec<Arc<str>>>,
 }
 
 /// [SI] configuration used in [`UnitsFile`]
