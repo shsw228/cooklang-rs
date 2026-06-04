@@ -42,6 +42,10 @@ jobs:
           key: ${{ runner.os }}-swift-spm-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-swift-spm-
 
+      - name: Build host release library for UniFFI
+        run: |
+          cargo build --release -p cooklang-bindings
+
       - name: Build XCFramework and update Package.swift
         working-directory: bindings
         env:
