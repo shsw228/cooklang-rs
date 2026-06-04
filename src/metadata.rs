@@ -885,7 +885,7 @@ mod tests {
     #[cfg(feature = "bundled_units")]
     #[test]
     fn test_parse_time_with_units() {
-        let converter = Converter::bundled();
+        let converter = Converter::bundled_with_locale("ja_JP");
         let t = |s: &str| parse_time_with_units(s, &converter).ok();
         assert_eq!(t(""), Some(0));
         assert_eq!(t("1"), None);
@@ -902,6 +902,10 @@ mod tests {
         assert_eq!(t("25 secs"), Some(0)); // round down
         assert_eq!(t("1 min 25 secs"), Some(1)); // round down
         assert_eq!(t("   0  hours 90min 59 sec "), Some(91));
+        assert_eq!(t("30 秒"), Some(1));
+        assert_eq!(t("3 分"), Some(3));
+        assert_eq!(t("1 時間"), Some(60));
+        assert_eq!(t("1 時間 30 分"), Some(90));
     }
 
     #[test]

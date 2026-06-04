@@ -52,7 +52,7 @@
 //! not cover but the pareser does.
 
 mod block_parser;
-mod frontmatter;
+pub(crate) mod frontmatter;
 mod metadata;
 mod model;
 mod quantity;

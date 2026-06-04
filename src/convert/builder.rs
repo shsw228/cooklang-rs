@@ -5,7 +5,10 @@ use thiserror::Error;
 
 use super::{
     convert_f64,
-    units_file::{self, BestUnits, Extend, Precedence, SIPrefix, UnitEntry, Units, UnitsFile, SI},
+    units_file::{
+        self, BestUnits, Extend, ExtendUnitEntry, LocaleAliases, Precedence, SIPrefix, UnitEntry,
+        Units, UnitsFile, SI,
+    },
     BestConversions, BestConversionsStore, Converter, Fractions, PhysicalQuantity, System, Unit,
     UnitIndex, UnknownUnit,
 };
@@ -72,15 +75,44 @@ impl ConverterBuilder {
         Ok(self)
     }
 
+    /// Add the bundled units and apply locale-specific alias overlays.
+    #[cfg(feature = "bundled_units")]
+    pub fn add_bundled_units_locale(
+        &mut self,
+        locale: &str,
+    ) -> Result<&mut Self, ConverterBuilderError> {
+        self.add_units_file_locale(UnitsFile::bundled(), locale)?;
+        Ok(self)
+    }
+
     /// Add a [`UnitsFile`] to the builder
     pub fn with_units_file(mut self, units: UnitsFile) -> Result<Self, ConverterBuilderError> {
         self.add_units_file(units)?;
         Ok(self)
     }
 
+    /// Add a [`UnitsFile`] and apply locale-specific alias overlays.
+    pub fn with_units_file_locale(
+        mut self,
+        units: UnitsFile,
+        locale: &str,
+    ) -> Result<Self, ConverterBuilderError> {
+        self.add_units_file_locale(units, locale)?;
+        Ok(self)
+    }
+
     /// Add a [`UnitsFile`] to the builder
     pub fn add_units_file(&mut self, units: UnitsFile) -> Result<&mut Self, ConverterBuilderError> {
-        for group in units.quantity {
+        let UnitsFile {
+            default_system,
+            si,
+            fractions,
+            extend,
+            locale_aliases,
+            quantity,
+        } = units;
+
+        for group in quantity {
             // Add all units to an index
             let mut add_units =
                 |units: Vec<UnitEntry>, system| -> Result<(), ConverterBuilderError> {
@@ -136,12 +168,12 @@ impl ConverterBuilder {
         }
 
         // Store the extensions to apply them at the end
-        if let Some(extend) = units.extend {
+        if let Some(extend) = extend {
             self.extend.push(extend);
         }
 
         // Join the SI expansion settings
-        if let Some(si) = units.si {
+        if let Some(si) = si {
             self.si.prefixes = join_prefixes(&mut self.si.prefixes, si.prefixes, si.precedence);
             self.si.symbol_prefixes = join_prefixes(
                 &mut self.si.symbol_prefixes,
@@ -151,14 +183,30 @@ impl ConverterBuilder {
             self.si.precedence = si.precedence;
         }
 
-        if let Some(default_system) = units.default_system {
+        if let Some(default_system) = default_system {
             self.default_system = default_system;
         }
 
-        if let Some(fractions) = units.fractions {
+        if let Some(fractions) = fractions {
             self.fractions.push(fractions);
         }
 
+        let _ = locale_aliases;
+
+        Ok(self)
+    }
+
+    /// Add a [`UnitsFile`] and apply locale-scoped aliases for the given locale.
+    pub fn add_units_file_locale(
+        &mut self,
+        units: UnitsFile,
+        locale: &str,
+    ) -> Result<&mut Self, ConverterBuilderError> {
+        let locale_extend = locale_aliases_to_extend(&units.locale_aliases, locale);
+        self.add_units_file(units)?;
+        if let Some(extend) = locale_extend {
+            self.extend.push(extend);
+        }
         Ok(self)
     }
 
@@ -223,6 +271,47 @@ impl ConverterBuilder {
         self.unit_index.add_unit(&unit, id)?;
         self.all_units.push(unit);
         Ok(id)
+    }
+}
+
+fn locale_aliases_to_extend(
+    all: &HashMap<String, LocaleAliases>,
+    locale: &str,
+) -> Option<Extend> {
+    let aliases = all
+        .get(locale)
+        .or_else(|| all.get(locale.split(['-', '_']).next().unwrap_or(locale)))?;
+
+    let mut units = HashMap::new();
+
+    for quantity_group in [
+        &aliases.time,
+        &aliases.volume,
+        &aliases.mass,
+        &aliases.length,
+        &aliases.temperature,
+    ] {
+        for (unit_key, unit_aliases) in quantity_group {
+            units.insert(
+                unit_key.clone(),
+                ExtendUnitEntry {
+                    ratio: None,
+                    difference: None,
+                    names: None,
+                    symbols: None,
+                    aliases: Some(unit_aliases.clone()),
+                },
+            );
+        }
+    }
+
+    if units.is_empty() {
+        None
+    } else {
+        Some(Extend {
+            precedence: Precedence::After,
+            units,
+        })
     }
 }
 

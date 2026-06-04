@@ -10,6 +10,31 @@ pub mod shopping_list;
 use aisle::*;
 use model::*;
 
+fn locale_from_frontmatter(input: &str) -> Option<String> {
+    let mut lines = input.lines();
+    if lines.next()? != "---" {
+        return None;
+    }
+
+    let mut yaml = String::new();
+    for line in lines {
+        if line == "---" {
+            break;
+        }
+        yaml.push_str(line);
+        yaml.push('\n');
+    }
+
+    let value: serde_yaml::Value = serde_yaml::from_str(&yaml).ok()?;
+    let map = value.as_mapping()?;
+    let locale = map.get("locale")?.as_str()?;
+    if locale.is_empty() {
+        None
+    } else {
+        Some(locale.to_string())
+    }
+}
+
 /// Parses a Cooklang recipe from text and applies a scaling factor
 ///
 /// # Arguments
@@ -20,7 +45,14 @@ use model::*;
 /// A parsed recipe object with metadata, sections, ingredients, cookware and timers
 #[uniffi::export]
 pub fn parse_recipe(input: String, scaling_factor: f64) -> Arc<CooklangRecipe> {
-    let parser = cooklang::CooklangParser::canonical();
+    let parser = if let Some(locale) = locale_from_frontmatter(&input) {
+        cooklang::CooklangParser::new(
+            cooklang::Extensions::all(),
+            cooklang::Converter::bundled_with_locale(&locale),
+        )
+    } else {
+        cooklang::CooklangParser::canonical()
+    };
 
     let (mut parsed, _warnings) = parser.parse(&input).into_result().unwrap();
 
@@ -843,10 +875,6 @@ Cook something delicious
         assert_eq!(author.name, Some("John Doe".to_string()));
         assert_eq!(author.url, Some("https://johndoe.com".to_string()));
 
-        // Note: Time parsing requires units to be loaded in the converter
-        // Since we're using an empty converter, time parsing won't work for "1h 30m"
-        // We would need to add units configuration for this to work
-
         // Test text servings
         let servings = metadata_servings(&recipe);
         assert!(servings.is_some());
@@ -854,6 +882,32 @@ Cook something delicious
             Servings::Text { value } => assert_eq!(value, "2-3 portions"),
             _ => panic!("Expected text servings"),
         }
+    }
+
+    #[test]
+    fn test_parse_recipe_with_frontmatter_locale_aliases() {
+        use crate::{deref_timer, parse_recipe, Amount, Timer, Value};
+
+        let recipe = parse_recipe(
+            r#"---
+locale: ja_JP
+---
+玉ねぎを加えて~{3%分}煮る。
+"#
+            .to_string(),
+            1.0,
+        );
+
+        assert_eq!(
+            deref_timer(&recipe, 0),
+            Timer {
+                name: Some(String::new()),
+                amount: Some(Amount {
+                    quantity: Value::Number { value: 3.0 },
+                    units: Some("分".to_string()),
+                }),
+            }
+        );
     }
 
     #[test]

@@ -273,3 +273,41 @@ fn timer_missing_unit_warning() {
     // Should parse successfully (not error)
     let _r = result.unwrap_output();
 }
+
+#[test]
+fn localized_timer_units_with_bundled_converter() {
+    let input = "Cook for ~{30%秒}, then ~{3%分}, then ~{1%時間}";
+
+    let parser = CooklangParser::new(
+        Extensions::all(),
+        cooklang::Converter::bundled_with_locale("ja_JP"),
+    );
+    let result = parser.parse(input);
+    assert!(result.report().iter().next().is_none());
+    let recipe = result.unwrap_output();
+    assert_eq!(recipe.timers.len(), 3);
+    assert_eq!(recipe.timers[0].quantity.as_ref().and_then(|q| q.unit()), Some("秒"));
+    assert_eq!(recipe.timers[1].quantity.as_ref().and_then(|q| q.unit()), Some("分"));
+    assert_eq!(recipe.timers[2].quantity.as_ref().and_then(|q| q.unit()), Some("時間"));
+}
+
+#[cfg(feature = "bundled_units")]
+#[test]
+fn localized_timer_units_from_recipe_frontmatter_locale() {
+    let input = indoc! {r#"
+        ---
+        title: Locale-driven timer aliases
+        locale: ja_JP
+        ---
+
+        Cook for ~{30%秒}, then ~{3%分}, then ~{1%時間}
+    "#};
+
+    let result = cooklang::parse_with_recipe_locale(input);
+    assert!(result.report().iter().next().is_none());
+    let recipe = result.unwrap_output();
+    assert_eq!(recipe.timers.len(), 3);
+    assert_eq!(recipe.timers[0].quantity.as_ref().and_then(|q| q.unit()), Some("秒"));
+    assert_eq!(recipe.timers[1].quantity.as_ref().and_then(|q| q.unit()), Some("分"));
+    assert_eq!(recipe.timers[2].quantity.as_ref().and_then(|q| q.unit()), Some("時間"));
+}

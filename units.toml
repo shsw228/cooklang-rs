@@ -80,6 +80,11 @@ units = [
     { names = ["day", "days"], symbols = ["d"], ratio = 86400 },
 ]
 
+[locale_aliases.ja_JP.time]
+minute = ["分"]
+second = ["秒"]
+hour = ["時間"]
+
 [[quantity]]
 quantity = "temperature"
 best = { metric = ["C"], imperial = ["F"] }

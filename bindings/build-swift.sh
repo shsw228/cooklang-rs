@@ -7,6 +7,7 @@ trap popd EXIT
 
 NAME="CooklangParser"
 VERSION=${1:-"1.0"} # first arg or "1.0"
+RELEASE_REPOSITORY=${GITHUB_REPOSITORY:-"cooklang/cooklang-rs"}
 BUNDLE_IDENTIFIER="org.cooklang.$NAME"
 LIBRARY_NAME="libcooklang_bindings.a"
 FRAMEWORK_LIBRARY_NAME=${NAME}FFI
@@ -34,11 +35,15 @@ echo "Generating swift wrapper..."
 mkdir -p $OUT_PATH
 mkdir -p $WRAPPER_PATH
 CURRENT_ARCH=$(rustc --version --verbose | grep host | cut -f2 -d' ')
+HOST_LIBRARY_PATH="../target/$CURRENT_ARCH/release/$LIBRARY_NAME"
+if [ ! -f "$HOST_LIBRARY_PATH" ]; then
+  HOST_LIBRARY_PATH="../target/release/$LIBRARY_NAME"
+fi
 
 cargo run --features="uniffi/cli"  \
       --bin uniffi-bindgen generate \
       --config uniffi.toml \
-      --library ../target/$CURRENT_ARCH/release/$LIBRARY_NAME \
+      --library "$HOST_LIBRARY_PATH" \
       --language swift \
       --out-dir $OUT_PATH
 
@@ -121,7 +126,7 @@ echo "SHA256: $SHA256"
 # Update Package.swift with new version and checksum
 echo "Updating Package.swift..."
 PACKAGE_SWIFT_PATH="../Package.swift"
-sed -i '' "s|url: \"https://github.com/cooklang/cooklang-rs/releases/download/v[^/]*/CooklangParserFFI.xcframework.zip\"|url: \"https://github.com/cooklang/cooklang-rs/releases/download/v$VERSION/CooklangParserFFI.xcframework.zip\"|" $PACKAGE_SWIFT_PATH
+sed -i '' "s|url: \"https://github.com/.*/releases/download/v[^/]*/CooklangParserFFI.xcframework.zip\"|url: \"https://github.com/$RELEASE_REPOSITORY/releases/download/v$VERSION/CooklangParserFFI.xcframework.zip\"|" $PACKAGE_SWIFT_PATH
 sed -i '' "s|checksum: \"[^\"]*\"|checksum: \"$SHA256\"|" $PACKAGE_SWIFT_PATH
 
 echo "Build complete! Archive ready at: $OUT_PATH/$ZIP_NAME"
